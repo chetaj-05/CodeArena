@@ -4,15 +4,16 @@ import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
+import dns from "dns";
 
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config();
 connectDB();
 
 const app = express();
 const httpServer = createServer(app);
 
-// Socket.io setup
-const io = new Socket.Server(httpServer, {
+const io = new Server(httpServer, {
   cors: {
     origin: ["http://localhost:5173"],
     methods: ["GET", "POST"],
