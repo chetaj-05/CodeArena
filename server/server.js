@@ -5,7 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import dns from "dns";
-
+import authRoutes from "./routes/authRoutes.js";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config();
 connectDB();
@@ -32,6 +32,7 @@ app.use(express.json());
 
 // Routes (will add phase by phase)
 app.get("/", (req, res) => res.json({ message: "CodeBattle API running 🚀" }));
+app.use("/api/auth", authRoutes);
 
 // Socket connection (will build in Phase 5)
 io.on("connection", (socket) => {
