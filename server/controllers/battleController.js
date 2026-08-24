@@ -2,7 +2,7 @@ import Battle from "../models/Battle.js";
 import Problem from "../models/Problem.js";
 import User from "../models/User.js";
 import generateRoomCode from "../utils/generateRoomCode.js";
-import { judgeAnswers, generateHint } from "../services/aiJudgeService.js";
+import { analyzeCode, generateHint } from "../services/aiJudgeService.js";
 import { io } from "../server.js";
 
 // Create battle room

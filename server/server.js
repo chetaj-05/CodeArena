@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -6,7 +7,8 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import dns from "dns";
 import authRoutes from "./routes/authRoutes.js";
-
+import codeRoutes from "./routes/codeRoutes.js";
+import battleRoutes from "./routes/battleRoutes.js";
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config();
 connectDB();
@@ -34,7 +36,8 @@ app.use(express.json());
 // Routes (will add phase by phase)
 app.get("/", (req, res) => res.json({ message: "CodeBattle API running 🚀" }));
 app.use("/api/auth", authRoutes);
-
+app.use("/api/code", codeRoutes);
+app.use("/api/battles", battleRoutes);
 // Socket connection (will build in Phase 5)
 io.on("connection", (socket) => {
   console.log(`Socket connected: ${socket.id}`);

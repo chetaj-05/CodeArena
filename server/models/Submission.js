@@ -17,10 +17,7 @@ const submissionSchema = new mongoose.Schema(
       ref: "Problem",
       required: true,
     },
-    code: {
-      type: String,
-      required: true,
-    },
+    code: { type: String, required: true },
     language: {
       type: String,
       enum: ["javascript", "python"],

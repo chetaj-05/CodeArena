@@ -4,47 +4,38 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-export const judgeAnswers = async ({
+export const analyzeCode = async ({
   problem,
-  player1Answer,
-  player2Answer,
+  player1Code,
+  player2Code,
   player1Name,
   player2Name,
+  player1Language,
+  player2Language,
 }) => {
   const prompt = `
-You are an expert technical interviewer and judge evaluating two candidates.
+You are an expert software engineer reviewing two solutions to a coding problem.
 
 Problem: ${problem.title}
 Description: ${problem.description}
-Evaluation Criteria: ${problem.evaluationCriteria}
-Ideal Answer Reference: ${problem.idealAnswer}
+${problem.evaluationCriteria ? `Evaluation Criteria: ${problem.evaluationCriteria}` : ""}
 
-Candidate 1 (${player1Name}): 
-${player1Answer || "No answer submitted"}
+${player1Name}'s solution (${player1Language}):
+\`\`\`
+${player1Code}
+\`\`\`
 
-Candidate 2 (${player2Name}):
-${player2Answer || "No answer submitted"}
+${player2Name}'s solution (${player2Language}):
+\`\`\`
+${player2Code}
+\`\`\`
 
-Evaluate both candidates on these 4 criteria (total 100 points):
-1. Correctness of approach (0-40 points)
-2. Time complexity awareness (0-20 points)
-3. Space complexity awareness (0-20 points)
-4. Edge cases handled (0-20 points)
-
-Rules:
-- If a candidate did not submit an answer give them 0
-- Be fair and objective
-- Small differences in score (less than 5) should be considered a draw
-- Return ONLY this JSON with no extra text:
-
+Analyze both solutions and return ONLY this JSON with no extra text:
 {
-  "player1Score": <number 0-100>,
-  "player2Score": <number 0-100>,
-  "winner": "<player1 or player2 or draw>",
-  "player1Feedback": "<2-3 sentences specific feedback for candidate 1>",
-  "player2Feedback": "<2-3 sentences specific feedback for candidate 2>",
-  "idealAnswerSummary": "<brief 2-3 sentence ideal answer explanation>",
-  "judgeSummary": "<1-2 sentence overall battle summary>"
+  "player1Feedback": "<2-3 sentences about code quality, time complexity, improvements for ${player1Name}>",
+  "player2Feedback": "<2-3 sentences about code quality, time complexity, improvements for ${player2Name}>",
+  "idealSolution": "<brief explanation of the optimal approach in 2-3 sentences>",
+  "summary": "<1 sentence overall battle summary>"
 }
 `;
 
@@ -52,7 +43,7 @@ Rules:
     model: "llama-3.3-70b-versatile",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.3,
-    max_tokens: 1000,
+    max_tokens: 800,
   });
 
   const text = response.choices[0].message.content;
@@ -60,19 +51,21 @@ Rules:
   return JSON.parse(clean);
 };
 
-export const generateHint = async ({ problem, playerAnswer }) => {
+export const generateHint = async ({ problem, currentCode, language }) => {
   const prompt = `
 You are a helpful coding mentor giving a hint to a student.
 
 Problem: ${problem.title}
 Description: ${problem.description}
 
-Student's current thinking:
-${playerAnswer || "Student hasn't written anything yet"}
+Student's current code (${language}):
+\`\`\`
+${currentCode || "No code written yet"}
+\`\`\`
 
 Give a helpful hint that:
-- Points them in the right direction WITHOUT giving the answer
-- Mentions one key concept they should think about
+- Points them in the right direction WITHOUT giving the full solution
+- Mentions one key concept or data structure to think about
 - Is encouraging and concise (2-3 sentences max)
 
 Return ONLY the hint text, no extra formatting.
@@ -82,7 +75,7 @@ Return ONLY the hint text, no extra formatting.
     model: "llama-3.3-70b-versatile",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
-    max_tokens: 200,
+    max_tokens: 150,
   });
 
   return response.choices[0].message.content.trim();
