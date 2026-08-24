@@ -1,26 +1,26 @@
 import Problem from "../models/Problem.js";
 import Submission from "../models/Submission.js";
 import Battle from "../models/Battle.js";
-import { executeCode, runTestCases } from "../services/pistonService.js";
+import { runTestCases } from "../services/pistonService.js";
+import { analyzeCode } from "../services/aiJudgeService.js";
+import { io } from "../server.js";
 
-// Run code against visible test cases only (no submission)
+// Run code against visible test cases only
 export const runCode = async (req, res) => {
   try {
     const { code, language, slug } = req.body;
 
     if (!code || !language || !slug) {
-      return res
-        .status(400)
-        .json({ message: "Code, language and problem slug are required" });
+      return res.status(400).json({
+        message: "Code, language and problem slug are required",
+      });
     }
 
     const problem = await Problem.findOne({ slug });
-
     if (!problem) {
       return res.status(404).json({ message: "Problem not found" });
     }
 
-    // Only run visible test cases
     const visibleTestCases = problem.testCases.filter((tc) => !tc.isHidden);
     const result = await runTestCases(code, language, visibleTestCases);
 
@@ -36,7 +36,7 @@ export const runCode = async (req, res) => {
   }
 };
 
-// Submit code against ALL test cases (including hidden)
+// Submit code against ALL test cases + AI feedback
 export const submitCode = async (req, res) => {
   try {
     const { code, language, slug, battleId } = req.body;
@@ -46,13 +46,14 @@ export const submitCode = async (req, res) => {
     }
 
     const problem = await Problem.findOne({ slug });
-
     if (!problem) {
       return res.status(404).json({ message: "Problem not found" });
     }
 
-    const battle = await Battle.findById(battleId);
-
+    const battle = await Battle.findById(battleId).populate(
+      "players.user",
+      "name",
+    );
     if (!battle) {
       return res.status(404).json({ message: "Battle not found" });
     }
@@ -78,7 +79,7 @@ export const submitCode = async (req, res) => {
 
     // Update player in battle
     const playerIndex = battle.players.findIndex(
-      (p) => p.user.toString() === req.user.id,
+      (p) => p.user._id.toString() === req.user.id,
     );
 
     if (playerIndex !== -1) {
@@ -89,42 +90,50 @@ export const submitCode = async (req, res) => {
       battle.players[playerIndex].submittedAt = new Date();
 
       if (result.status === "accepted") {
+        // This player won
         battle.players[playerIndex].status = "won";
 
         // Set other player as lost
         battle.players.forEach((p, i) => {
-          if (i !== playerIndex) {
-            p.status = "lost";
-          }
+          if (i !== playerIndex) p.status = "lost";
         });
 
-        battle.status = "completed";
+        battle.status = "judging";
         battle.winner = req.user.id;
         battle.endedAt = new Date();
 
-        // Update user stats
-        await updateUserStats(req.user.id, "win", problem.slug);
-        const loserId = battle.players.find(
-          (p) => p.user.toString() !== req.user.id,
-        )?.user;
-        if (loserId) await updateUserStats(loserId, "loss", null);
+        await battle.save();
+
+        // Notify both players battle is over
+        io.to(battle.roomCode).emit("battle_over", {
+          winnerId: req.user.id,
+          winnerName: battle.players[playerIndex].user.name,
+          passed: result.passed,
+          total: result.total,
+          battleId: battle._id,
+        });
+
+        // Run AI analysis in background
+        runAIAnalysis(battle, problem);
+
+        // Update winner stats
+        await updateUserStats(req.user.id, "win");
+        const loserId = battle.players.find((p, i) => i !== playerIndex)?.user
+          ._id;
+        if (loserId) await updateUserStats(loserId, "loss");
       } else {
         battle.players[playerIndex].status = "submitted";
+        await battle.save();
+
+        // Notify opponent
+        io.to(battle.roomCode).emit("opponent_submitted", {
+          userId: req.user.id,
+          passed: result.passed,
+          total: result.total,
+          status: result.status,
+        });
       }
-
-      await battle.save();
     }
-
-    // Emit socket event to update both players
-    const { io } = await import("../server.js");
-    io.to(battle.roomCode).emit("submission_update", {
-      userId: req.user.id,
-      status: result.status,
-      passed: result.passed,
-      total: result.total,
-      battleStatus: battle.status,
-      winner: battle.winner,
-    });
 
     res.json({
       status: result.status,
@@ -139,23 +148,56 @@ export const submitCode = async (req, res) => {
   }
 };
 
-const updateUserStats = async (userId, result, problemSlug) => {
+// Run AI analysis after battle ends
+const runAIAnalysis = async (battle, problem) => {
+  try {
+    const player1 = battle.players[0];
+    const player2 = battle.players[1];
+
+    if (!player1?.code || !player2?.code) return;
+
+    const analysis = await analyzeCode({
+      problem,
+      player1Code: player1.code,
+      player2Code: player2.code,
+      player1Name: player1.user.name,
+      player2Name: player2.user.name,
+      player1Language: player1.language,
+      player2Language: player2.language,
+    });
+
+    // Save AI feedback to battle
+    battle.players[0].aiFeedback = analysis.player1Feedback;
+    battle.players[1].aiFeedback = analysis.player2Feedback;
+    battle.aiJudgeSummary = analysis.summary;
+    battle.status = "completed";
+
+    await battle.save();
+
+    // Send AI feedback to both players
+    io.to(battle.roomCode).emit("ai_feedback_ready", {
+      player1Feedback: analysis.player1Feedback,
+      player2Feedback: analysis.player2Feedback,
+      idealSolution: analysis.idealSolution,
+      summary: analysis.summary,
+      battleId: battle._id,
+    });
+  } catch (error) {
+    console.error("AI analysis error:", error);
+    battle.status = "completed";
+    await battle.save();
+  }
+};
+
+const updateUserStats = async (userId, result) => {
   try {
     const User = (await import("../models/User.js")).default;
     const user = await User.findById(userId);
-
     if (!user) return;
 
     user.stats.battlesPlayed += 1;
-
-    if (result === "win") {
-      user.stats.wins += 1;
-      if (problemSlug && !user.stats.problemsSolved.includes(problemSlug)) {
-        user.stats.problemsSolved.push(problemSlug);
-      }
-    } else {
-      user.stats.losses += 1;
-    }
+    if (result === "win") user.stats.wins += 1;
+    else user.stats.losses += 1;
 
     user.stats.winRate = Math.round(
       (user.stats.wins / user.stats.battlesPlayed) * 100,

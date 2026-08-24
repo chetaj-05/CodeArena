@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import dns from "dns";
 import authRoutes from "./routes/authRoutes.js";
+
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
 dotenv.config();
 connectDB();

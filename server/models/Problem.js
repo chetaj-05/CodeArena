@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+const exampleSchema = new mongoose.Schema({
+  input: String,
+  output: String,
+  explanation: String,
+});
+
 const testCaseSchema = new mongoose.Schema({
   input: { type: String, required: true },
   expectedOutput: { type: String, default: "" },
@@ -33,17 +39,19 @@ const problemSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    examples: [
-      {
-        input: String,
-        output: String,
-        explanation: String,
-      },
-    ],
+    examples: [exampleSchema],
     testCases: [testCaseSchema],
     starterCode: {
       javascript: { type: String, default: "// Write your solution here\n" },
       python: { type: String, default: "# Write your solution here\n" },
+    },
+    evaluationCriteria: {
+      type: String,
+      default: "",
+    },
+    idealAnswer: {
+      type: String,
+      default: "",
     },
     timeLimit: { type: Number, default: 2000 },
     memoryLimit: { type: Number, default: 256 },
