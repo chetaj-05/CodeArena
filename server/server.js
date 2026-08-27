@@ -1,15 +1,19 @@
 import "dotenv/config";
+import dns from "dns";
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
-import dns from "dns";
 import authRoutes from "./routes/authRoutes.js";
+import problemRoutes from "./routes/problemRoutes.js";
 import codeRoutes from "./routes/codeRoutes.js";
 import battleRoutes from "./routes/battleRoutes.js";
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
+import battleSocket from "./socket/battleSocket.js";
+
 dotenv.config();
 connectDB();
 
@@ -33,21 +37,14 @@ app.use(
 );
 app.use(express.json());
 
-// Routes (will add phase by phase)
-app.get("/", (req, res) => res.json({ message: "CodeBattle API running 🚀" }));
+app.get("/", (req, res) => res.json({ message: "CodeArena API running 🚀" }));
 app.use("/api/auth", authRoutes);
+app.use("/api/problems", problemRoutes);
 app.use("/api/code", codeRoutes);
 app.use("/api/battles", battleRoutes);
-// Socket connection (will build in Phase 5)
-io.on("connection", (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
 
-  socket.on("disconnect", () => {
-    console.log(`Socket disconnected: ${socket.id}`);
-  });
-});
+battleSocket(io);
 
-// Export io so other files can use it
 export { io };
 
 const PORT = process.env.PORT || 5000;
