@@ -58,37 +58,36 @@ function BattleRoom() {
   useEffect(() => {
     if (!socket || !battle) return;
 
+    // Only join once
     socket.emit("join_room", { roomCode, userId: user?.id });
 
-    socket.on("player_joined", ({ players, battleStatus }) => {
+    const handlePlayerJoined = ({ players, battleStatus }) => {
       setBattle((prev) =>
         prev ? { ...prev, players, status: battleStatus } : prev,
       );
-      if (battleStatus === "active") {
+      if (battleStatus === "active")
         toast.success("Opponent joined! Get ready...");
-      }
-    });
+    };
 
-    socket.on("battle_starting", () => setCountdown(3));
-    socket.on("countdown", ({ count }) => setCountdown(count));
-
-    socket.on("battle_started", () => {
+    const handleBattleStarting = () => setCountdown(3);
+    const handleCountdown = ({ count }) => setCountdown(count);
+    const handleBattleStarted = () => {
       setCountdown(null);
       setBattleStarted(true);
       startTimer();
       toast.success("Battle started! Good luck! 🚀");
-    });
+    };
 
-    socket.on("opponent_coding", ({ linesOfCode }) => {
+    const handleOpponentCoding = ({ linesOfCode }) => {
       setOpponentStatus((prev) => ({ ...prev, linesOfCode, status: "coding" }));
-    });
+    };
 
-    socket.on("opponent_ran_code", ({ passed, total }) => {
+    const handleOpponentRanCode = ({ passed, total }) => {
       setOpponentStatus((prev) => ({ ...prev, passed, total }));
       toast(`Opponent ran code: ${passed}/${total} passed`, { icon: "⚡" });
-    });
+    };
 
-    socket.on("opponent_submitted", ({ passed, total, status }) => {
+    const handleOpponentSubmitted = ({ passed, total, status }) => {
       setOpponentStatus((prev) => ({
         ...prev,
         status: "submitted",
@@ -101,61 +100,72 @@ function BattleRoom() {
           : `Opponent submitted: ${passed}/${total} passed`,
         { icon: "📊" },
       );
-    });
+    };
 
-    socket.on("battle_over", ({ winnerId, winnerName, passed, total }) => {
+    const handleBattleOver = ({ winnerId, winnerName }) => {
       setBattleEnded(true);
       clearInterval(timerRef.current);
       const isWinner = winnerId === user?.id;
       toast(
-        isWinner
-          ? "🎉 You won! AI feedback coming..."
-          : `${winnerName} won! AI feedback coming...`,
+        isWinner ? "🎉 You won! AI feedback coming..." : `${winnerName} won!`,
         { duration: 4000 },
       );
-    });
+    };
 
-    socket.on("ai_feedback_ready", (data) => {
+    const handleAiFeedbackReady = (data) => {
       setAiFeedback(data);
       setShowAiFeedback(true);
       setActiveTab("feedback");
       toast.success("AI feedback is ready! 🤖");
-      setTimeout(() => navigate(`/battle/result/${battle._id}`), 8000);
-    });
+      setTimeout(() => navigate(`/battle/result/${battle._id}`), 5000);
+    };
 
-    socket.on("battle_ended", ({ reason }) => {
+    const handleBattleEnded = ({ reason }) => {
       setBattleEnded(true);
       clearInterval(timerRef.current);
       if (reason === "timeout") toast.error("Time's up!");
       setTimeout(() => navigate(`/battle/result/${battle._id}`), 3000);
-    });
+    };
 
-    socket.on("player_disconnected", ({ userId: disconnectedId }) => {
+    const handlePlayerDisconnected = ({ userId: disconnectedId }) => {
       if (disconnectedId !== user?.id) {
         toast.error("Opponent disconnected!");
         setOpponentStatus((prev) => ({ ...prev, status: "disconnected" }));
       }
-    });
+    };
 
-    socket.on("new_message", (msg) => {
+    const handleNewMessage = (msg) => {
       setMessages((prev) => [...prev, msg]);
-    });
+    };
+
+    socket.on("player_joined", handlePlayerJoined);
+    socket.on("battle_starting", handleBattleStarting);
+    socket.on("countdown", handleCountdown);
+    socket.on("battle_started", handleBattleStarted);
+    socket.on("opponent_coding", handleOpponentCoding);
+    socket.on("opponent_ran_code", handleOpponentRanCode);
+    socket.on("opponent_submitted", handleOpponentSubmitted);
+    socket.on("battle_over", handleBattleOver);
+    socket.on("ai_feedback_ready", handleAiFeedbackReady);
+    socket.on("battle_ended", handleBattleEnded);
+    socket.on("player_disconnected", handlePlayerDisconnected);
+    socket.on("new_message", handleNewMessage);
 
     return () => {
-      socket.off("player_joined");
-      socket.off("battle_starting");
-      socket.off("countdown");
-      socket.off("battle_started");
-      socket.off("opponent_coding");
-      socket.off("opponent_ran_code");
-      socket.off("opponent_submitted");
-      socket.off("battle_over");
-      socket.off("ai_feedback_ready");
-      socket.off("battle_ended");
-      socket.off("player_disconnected");
-      socket.off("new_message");
+      socket.off("player_joined", handlePlayerJoined);
+      socket.off("battle_starting", handleBattleStarting);
+      socket.off("countdown", handleCountdown);
+      socket.off("battle_started", handleBattleStarted);
+      socket.off("opponent_coding", handleOpponentCoding);
+      socket.off("opponent_ran_code", handleOpponentRanCode);
+      socket.off("opponent_submitted", handleOpponentSubmitted);
+      socket.off("battle_over", handleBattleOver);
+      socket.off("ai_feedback_ready", handleAiFeedbackReady);
+      socket.off("battle_ended", handleBattleEnded);
+      socket.off("player_disconnected", handlePlayerDisconnected);
+      socket.off("new_message", handleNewMessage);
     };
-  }, [socket, battle, roomCode]);
+  }, [socket, battle?._id, roomCode]);
 
   const fetchBattle = async () => {
     try {

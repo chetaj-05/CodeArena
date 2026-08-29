@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getProblems } from "../services/problemService";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 const DIFFICULTIES = ["all", "easy", "medium", "hard"];
 
@@ -9,7 +10,7 @@ function Problems() {
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState("all");
   const [search, setSearch] = useState("");
-
+  const navigate = useNavigate();
   useEffect(() => {
     fetchProblems();
   }, [difficulty]);
@@ -88,7 +89,8 @@ function Problems() {
             {filtered.map((problem, index) => (
               <div
                 key={problem._id}
-                className="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/5 transition-colors group"
+                onClick={() => navigate(`/battle`)}
+                className="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/5 transition-colors group cursor-pointer"
               >
                 <div className="col-span-1 text-gray-600 text-sm">
                   {index + 1}
