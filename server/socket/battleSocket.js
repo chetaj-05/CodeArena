@@ -36,8 +36,15 @@ const battleSocket = (io) => {
           problem: battle.problem,
         });
 
+        // Replace the join_room handler's countdown section with this:
+
         const usersInRoom = roomUsers.get(roomCode)?.size || 0;
         if (battle.status === "active" && usersInRoom >= 2) {
+          // Prevent multiple countdowns for same room
+          if (!global.activeCountdowns) global.activeCountdowns = new Set();
+          if (global.activeCountdowns.has(roomCode)) return;
+          global.activeCountdowns.add(roomCode);
+
           io.to(roomCode).emit("battle_starting", { countdown: 3 });
 
           let count = 3;
@@ -47,6 +54,7 @@ const battleSocket = (io) => {
               io.to(roomCode).emit("countdown", { count });
             } else {
               clearInterval(interval);
+              global.activeCountdowns.delete(roomCode);
               io.to(roomCode).emit("battle_started", {
                 startedAt: new Date(),
               });
