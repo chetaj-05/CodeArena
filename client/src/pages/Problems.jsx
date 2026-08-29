@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProblems } from "../services/problemService";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
 
 const DIFFICULTIES = ["all", "easy", "medium", "hard"];
 
@@ -10,7 +9,8 @@ function Problems() {
   const [loading, setLoading] = useState(true);
   const [difficulty, setDifficulty] = useState("all");
   const [search, setSearch] = useState("");
-  const navigate = useNavigate();
+  const [selected, setSelected] = useState(null);
+
   useEffect(() => {
     fetchProblems();
   }, [difficulty]);
@@ -36,13 +36,15 @@ function Problems() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white">Problems</h1>
         <p className="text-gray-400 mt-1 text-sm">
-          {problems.length} problems available
+          {problems.length} problems available — click any to read details
         </p>
       </div>
 
+      {/* Filters */}
       <div className="bg-white/5 dark:bg-[#13131f] border border-white/5 rounded-2xl p-4 flex flex-col sm:flex-row gap-3">
         <input
           type="text"
@@ -68,16 +70,10 @@ function Problems() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white/5 dark:bg-[#13131f] border border-white/5 rounded-2xl py-20 text-center">
-          <p className="text-4xl mb-3">📋</p>
-          <p className="text-gray-400 font-medium">No problems found</p>
-        </div>
-      ) : (
+      <div
+        className={`grid gap-6 ${selected ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1"}`}
+      >
+        {/* Problems list */}
         <div className="bg-white/5 dark:bg-[#13131f] border border-white/5 rounded-2xl overflow-hidden">
           <div className="grid grid-cols-12 px-6 py-3 border-b border-white/5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             <div className="col-span-1">#</div>
@@ -85,49 +81,171 @@ function Problems() {
             <div className="col-span-3">Difficulty</div>
             <div className="col-span-3">Tags</div>
           </div>
-          <div className="divide-y divide-white/5">
-            {filtered.map((problem, index) => (
-              <div
-                key={problem._id}
-                onClick={() => navigate(`/battle`)}
-                className="grid grid-cols-12 px-6 py-4 items-center hover:bg-white/5 transition-colors group cursor-pointer"
-              >
-                <div className="col-span-1 text-gray-600 text-sm">
-                  {index + 1}
+
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-20 text-center">
+              <p className="text-4xl mb-3">📋</p>
+              <p className="text-gray-400 font-medium">No problems found</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {filtered.map((problem, index) => (
+                <div
+                  key={problem._id}
+                  onClick={() =>
+                    setSelected(selected?._id === problem._id ? null : problem)
+                  }
+                  className={`grid grid-cols-12 px-6 py-4 items-center cursor-pointer transition-colors ${
+                    selected?._id === problem._id
+                      ? "bg-violet-500/10 border-l-2 border-violet-500"
+                      : "hover:bg-white/5"
+                  }`}
+                >
+                  <div className="col-span-1 text-gray-600 text-sm">
+                    {index + 1}
+                  </div>
+                  <div className="col-span-5">
+                    <p
+                      className={`text-sm font-semibold transition-colors ${
+                        selected?._id === problem._id
+                          ? "text-violet-400"
+                          : "text-white"
+                      }`}
+                    >
+                      {problem.title}
+                    </p>
+                  </div>
+                  <div className="col-span-3">
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${
+                        problem.difficulty === "easy"
+                          ? "bg-green-500/10 text-green-400"
+                          : problem.difficulty === "medium"
+                            ? "bg-yellow-500/10 text-yellow-400"
+                            : "bg-red-500/10 text-red-400"
+                      }`}
+                    >
+                      {problem.difficulty}
+                    </span>
+                  </div>
+                  <div className="col-span-3 flex flex-wrap gap-1">
+                    {problem.tags?.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-500"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-                <div className="col-span-5">
-                  <p className="text-sm font-semibold text-white group-hover:text-violet-400 transition-colors">
-                    {problem.title}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Problem detail panel */}
+        {selected && (
+          <div className="bg-white/5 dark:bg-[#13131f] border border-white/5 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-semibold text-white">
+                  {selected.title}
+                </h2>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${
+                    selected.difficulty === "easy"
+                      ? "bg-green-500/10 text-green-400"
+                      : selected.difficulty === "medium"
+                        ? "bg-yellow-500/10 text-yellow-400"
+                        : "bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {selected.difficulty}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="text-gray-500 hover:text-white transition-colors text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[600px] space-y-5">
+              {/* Tags */}
+              <div className="flex flex-wrap gap-2">
+                {selected.tags?.map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-xs px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Description
+                </p>
+                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                  {selected.description}
+                </p>
+              </div>
+
+              {/* Constraints */}
+              {selected.constraints && (
+                <div className="bg-white/5 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 mb-2">
+                    Constraints
+                  </p>
+                  <p className="text-xs text-gray-400 font-mono whitespace-pre-line">
+                    {selected.constraints}
                   </p>
                 </div>
-                <div className="col-span-3">
-                  <span
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${
-                      problem.difficulty === "easy"
-                        ? "bg-green-500/10 text-green-400"
-                        : problem.difficulty === "medium"
-                          ? "bg-yellow-500/10 text-yellow-400"
-                          : "bg-red-500/10 text-red-400"
-                    }`}
-                  >
-                    {problem.difficulty}
-                  </span>
+              )}
+
+              {/* Examples */}
+              {selected.examples?.map((ex, i) => (
+                <div key={i}>
+                  <p className="text-xs font-semibold text-gray-400 mb-2">
+                    Example {i + 1}
+                  </p>
+                  <div className="bg-white/5 rounded-xl p-4 space-y-2 font-mono text-xs">
+                    <p className="text-gray-400">
+                      <span className="text-gray-500">Input: </span>
+                      {ex.input}
+                    </p>
+                    <p className="text-gray-400">
+                      <span className="text-gray-500">Output: </span>
+                      {ex.output}
+                    </p>
+                    {ex.explanation && (
+                      <p className="text-gray-500">{ex.explanation}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="col-span-3 flex flex-wrap gap-1">
-                  {problem.tags?.slice(0, 2).map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-gray-500"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+              ))}
+
+              {/* Practice in battle button */}
+              <div className="pt-2">
+                <a
+                  href="/battle"
+                  className="block w-full text-center bg-violet-600 hover:bg-violet-700 text-white py-3 rounded-xl text-sm font-semibold transition-all shadow-lg shadow-violet-500/20"
+                >
+                  ⚔️ Practice this in a Battle
+                </a>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

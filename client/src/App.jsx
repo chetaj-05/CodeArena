@@ -10,7 +10,7 @@ import Problems from "./pages/Problems";
 import BattleLobby from "./pages/BattleLobby";
 import BattleRoom from "./pages/BattleRoom";
 import BattleResult from "./pages/BattleResult";
-import Leaderboard from "./pages/Leaderboard";
+import LeaderBoard from "./pages/LeaderBoard";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
