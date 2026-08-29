@@ -60,10 +60,10 @@ function App() {
                   }
                 />
                 <Route
-                  path="/leaderboard"
+                  path="/LeaderBoard "
                   element={
                     <Layout>
-                      <Leaderboard />
+                      <LeaderBoard />
                     </Layout>
                   }
                 />
