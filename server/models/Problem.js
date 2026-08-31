@@ -42,8 +42,15 @@ const problemSchema = new mongoose.Schema(
     examples: [exampleSchema],
     testCases: [testCaseSchema],
     starterCode: {
-      javascript: { type: String, default: "// Write your solution here\n" },
-      python: { type: String, default: "# Write your solution here\n" },
+      python: {
+        type: String,
+        default: "# Write your solution here\n",
+      },
+      cpp: {
+        type: String,
+        default:
+          "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}\n",
+      },
     },
     evaluationCriteria: {
       type: String,
