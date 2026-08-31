@@ -153,21 +153,26 @@ export const submitCode = async (req, res) => {
 };
 
 // Run AI analysis after battle ends
+// Run AI analysis after battle ends
 const runAIAnalysis = async (battle, problem) => {
   try {
     const player1 = battle.players[0];
     const player2 = battle.players[1];
 
-    if (!player1?.code || !player2?.code) return;
+    // FIX 1: Don't exit if a player hasn't submitted code.
+    // Give the AI a fallback string instead so it can still evaluate the winner.
+    const p1Code = player1?.code || "# No code submitted by this player";
+    const p2Code = player2?.code || "# No code submitted by this player";
 
     const analysis = await analyzeCode({
       problem,
-      player1Code: player1.code,
-      player2Code: player2.code,
+      player1Code: p1Code,
+      player2Code: p2Code,
       player1Name: player1.user.name,
       player2Name: player2.user.name,
-      player1Language: player1.language,
-      player2Language: player2.language,
+      // Provide fallback languages just in case
+      player1Language: player1.language || "python",
+      player2Language: player2.language || "python",
     });
 
     // Save AI feedback to battle
@@ -190,25 +195,15 @@ const runAIAnalysis = async (battle, problem) => {
     console.error("AI analysis error:", error);
     battle.status = "completed";
     await battle.save();
-  }
-};
 
-const updateUserStats = async (userId, result) => {
-  try {
-    const User = (await import("../models/User.js")).default;
-    const user = await User.findById(userId);
-    if (!user) return;
-
-    user.stats.battlesPlayed += 1;
-    if (result === "win") user.stats.wins += 1;
-    else user.stats.losses += 1;
-
-    user.stats.winRate = Math.round(
-      (user.stats.wins / user.stats.battlesPlayed) * 100,
-    );
-
-    await user.save();
-  } catch (error) {
-    console.error("Update stats error:", error);
+    // FIX 2: If the AI API fails, we MUST tell the frontend so it doesn't load forever!
+    io.to(battle.roomCode).emit("ai_feedback_ready", {
+      player1Feedback: "AI analysis failed due to a server error.",
+      player2Feedback: "AI analysis failed due to a server error.",
+      idealSolution: "Not available.",
+      summary:
+        "There was an error generating the AI summary. The battle is over, but feedback could not be generated.",
+      battleId: battle._id,
+    });
   }
 };
