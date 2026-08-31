@@ -38,7 +38,8 @@ const battleSchema = new mongoose.Schema(
     players: [playerSchema],
     status: {
       type: String,
-      enum: ["waiting", "active", "completed"],
+      // FIX: Added "judging" to the array below!
+      enum: ["waiting", "active", "judging", "completed"],
       default: "waiting",
     },
     winner: {
