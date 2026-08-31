@@ -14,8 +14,8 @@ const playerSchema = new mongoose.Schema({
   code: { type: String, default: "" },
   language: {
     type: String,
-    enum: ["javascript", "python"],
-    default: "javascript",
+    enum: ["python", "cpp"],
+    default: "cpp",
   },
   testCasesPassed: { type: Number, default: 0 },
   totalTestCases: { type: Number, default: 0 },

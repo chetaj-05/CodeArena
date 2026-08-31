@@ -207,3 +207,23 @@ const runAIAnalysis = async (battle, problem) => {
     });
   }
 };
+// Change this to a standard async function so it hoists correctly
+async function updateUserStats(userId, result) {
+  try {
+    const User = (await import("../models/User.js")).default;
+    const user = await User.findById(userId);
+    if (!user) return;
+
+    user.stats.battlesPlayed += 1;
+    if (result === "win") user.stats.wins += 1;
+    else user.stats.losses += 1;
+
+    user.stats.winRate = Math.round(
+      (user.stats.wins / user.stats.battlesPlayed) * 100,
+    );
+
+    await user.save();
+  } catch (error) {
+    console.error("Update stats error:", error);
+  }
+}
