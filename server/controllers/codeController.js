@@ -143,13 +143,13 @@ export const submitCode = async (req, res) => {
       submissionId: submission._id,
     });
   } catch (error) {
-  console.error("Submit error full:", error.message);
-  console.error("Submit error stack:", error.stack);
-  res.status(500).json({ 
-    message: "Submission failed. Try again.",
-    error: error.message 
-  });
-
+    console.error("Submit error full:", error.message);
+    console.error("Submit error stack:", error.stack);
+    res.status(500).json({
+      message: "Submission failed. Try again.",
+      error: error.message,
+    });
+  }
 };
 
 // Run AI analysis after battle ends
