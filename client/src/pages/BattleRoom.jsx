@@ -8,13 +8,13 @@ import { runCode, submitCode } from "../services/codeService";
 import toast from "react-hot-toast";
 
 const LANGUAGES = [
-  { value: "javascript", label: "JavaScript" },
   { value: "python", label: "Python" },
+  { value: "cpp", label: "C++" },
 ];
 
 const STARTER_CODE = {
-  javascript: "// Write your solution here\n\n",
   python: "# Write your solution here\n\n",
+  cpp: "#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // Write your solution here\n    return 0;\n}\n",
 };
 
 function BattleRoom() {
@@ -25,8 +25,8 @@ function BattleRoom() {
 
   const [battle, setBattle] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [code, setCode] = useState(STARTER_CODE.javascript);
-  const [language, setLanguage] = useState("javascript");
+  const [language, setLanguage] = useState("python");
+  const [code, setCode] = useState(STARTER_CODE.python);
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [runResult, setRunResult] = useState(null);
@@ -177,8 +177,8 @@ function BattleRoom() {
         startTimer();
       }
 
-      if (data.problem?.starterCode?.javascript) {
-        setCode(data.problem.starterCode.javascript);
+      if (data.problem?.starterCode?.[language]) {
+        setCode(data.problem.starterCode[language]);
       }
     } catch (error) {
       toast.error("Battle not found");
@@ -853,7 +853,7 @@ function BattleRoom() {
           <div className="flex-1 overflow-hidden">
             <Editor
               height="100%"
-              language={language}
+              language={language === "cpp" ? "cpp" : "python"}
               value={code}
               onChange={handleEditorChange}
               theme="vs-dark"
@@ -863,7 +863,6 @@ function BattleRoom() {
                 scrollBeyondLastLine: false,
                 padding: { top: 16, bottom: 16 },
                 lineNumbers: "on",
-                renderLineHighlight: "line",
                 automaticLayout: true,
                 tabSize: 2,
                 wordWrap: "on",
