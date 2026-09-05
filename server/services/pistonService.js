@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const COMPILER_URL = "https://api.onlinecompiler.io/api/run-code/";
+const COMPILER_URL = "https://api.onlinecompiler.io/api/run-code-sync/";
 
 const LANGUAGE_CONFIG = {
   python: "python-3.14",
@@ -43,10 +43,14 @@ export const runTestCases = async (code, language, testCases) => {
   for (const testCase of testCases) {
     try {
       const result = await executeCode(code, language, testCase.input);
+
       const actualOutput = result.stdout.trim();
       const expectedOutput = testCase.expectedOutput.trim();
-      const isCorrect = actualOutput === expectedOutput;
 
+      const normalizedActual = actualOutput.replace(/\s+/g, "");
+      const normalizedExpected = expectedOutput.replace(/\s+/g, "");
+
+      const isCorrect = normalizedActual === normalizedExpected;
       if (isCorrect) passed++;
 
       results.push({
