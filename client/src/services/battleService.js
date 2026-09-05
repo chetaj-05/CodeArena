@@ -34,3 +34,7 @@ export const getHint = async (data) => {
   const res = await API.post("/battles/hint", data);
   return res.data;
 };
+export const surrenderBattle = async (data) => {
+  const res = await API.post("/battles/surrender", data);
+  return res.data;
+};

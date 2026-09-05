@@ -4,7 +4,7 @@ const COMPILER_URL = "https://api.onlinecompiler.io/api/run-code-sync/";
 
 const LANGUAGE_CONFIG = {
   python: "python-3.14",
-  cpp: "c++",
+  cpp: "g++-15",
 };
 
 const executeCode = async (code, language, stdin = "") => {

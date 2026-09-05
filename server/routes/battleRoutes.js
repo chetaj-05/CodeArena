@@ -10,8 +10,9 @@ import {
   getLeaderboard,
   getBattleHistory,
 } from "../controllers/battleController.js";
-
+import { surrenderBattle } from "../controllers/battleController.js";
 const router = express.Router();
+router.post("/surrender", protect, surrenderBattle);
 
 router.post("/create", protect, createBattle);
 router.post("/join", protect, joinBattle);

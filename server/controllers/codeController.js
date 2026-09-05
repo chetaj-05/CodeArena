@@ -154,36 +154,31 @@ export const submitCode = async (req, res) => {
 
 // Run AI analysis after battle ends
 // Run AI analysis after battle ends
-const runAIAnalysis = async (battle, problem) => {
+export const runAIAnalysis = async (battle, problem) => {
   try {
-    const player1 = battle.players[0];
-    const player2 = battle.players[1];
+    const p1 = battle.players[0];
+    const p2 = battle.players[1];
 
-    // FIX 1: Don't exit if a player hasn't submitted code.
-    // Give the AI a fallback string instead so it can still evaluate the winner.
-    const p1Code = player1?.code || "# No code submitted by this player";
-    const p2Code = player2?.code || "# No code submitted by this player";
+    // Run AI even if only winner submitted
+    const player1Code = p1?.code || "No solution submitted";
+    const player2Code = p2?.code || "No solution submitted";
 
     const analysis = await analyzeCode({
       problem,
-      player1Code: p1Code,
-      player2Code: p2Code,
-      player1Name: player1.user.name,
-      player2Name: player2.user.name,
-      // Provide fallback languages just in case
-      player1Language: player1.language || "python",
-      player2Language: player2.language || "python",
+      player1Code,
+      player2Code,
+      player1Name: p1?.user?.name || "Player 1",
+      player2Name: p2?.user?.name || "Player 2",
+      player1Language: p1?.language || "python",
+      player2Language: p2?.language || "python",
     });
 
-    // Save AI feedback to battle
     battle.players[0].aiFeedback = analysis.player1Feedback;
     battle.players[1].aiFeedback = analysis.player2Feedback;
     battle.aiJudgeSummary = analysis.summary;
     battle.status = "completed";
-
     await battle.save();
 
-    // Send AI feedback to both players
     io.to(battle.roomCode).emit("ai_feedback_ready", {
       player1Feedback: analysis.player1Feedback,
       player2Feedback: analysis.player2Feedback,
@@ -192,17 +187,16 @@ const runAIAnalysis = async (battle, problem) => {
       battleId: battle._id,
     });
   } catch (error) {
-    console.error("AI analysis error:", error);
+    console.error("AI analysis error:", error.message);
     battle.status = "completed";
     await battle.save();
 
-    // FIX 2: If the AI API fails, we MUST tell the frontend so it doesn't load forever!
+    // Still redirect even if AI fails
     io.to(battle.roomCode).emit("ai_feedback_ready", {
-      player1Feedback: "AI analysis failed due to a server error.",
-      player2Feedback: "AI analysis failed due to a server error.",
-      idealSolution: "Not available.",
-      summary:
-        "There was an error generating the AI summary. The battle is over, but feedback could not be generated.",
+      player1Feedback: "AI analysis unavailable.",
+      player2Feedback: "AI analysis unavailable.",
+      idealSolution: "Please review the problem solution manually.",
+      summary: "Battle completed.",
       battleId: battle._id,
     });
   }

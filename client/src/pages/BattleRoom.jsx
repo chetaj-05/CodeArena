@@ -6,7 +6,8 @@ import { useSocket } from "../context/SocketContext";
 import { getBattleByRoom } from "../services/battleService";
 import { runCode, submitCode } from "../services/codeService";
 import toast from "react-hot-toast";
-
+import { surrenderBattle } from "../services/battleService";
+import API from "../services/api";
 const LANGUAGES = [
   { value: "python", label: "Python" },
   { value: "cpp", label: "C++" },
@@ -22,7 +23,8 @@ function BattleRoom() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { socket } = useSocket();
-
+  const [surrendering, setSurrendering] = useState(false);
+  const battleStartTimeRef = useRef(null);
   const [battle, setBattle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState("python");
@@ -71,10 +73,10 @@ function BattleRoom() {
 
     const handleBattleStarting = () => setCountdown(3);
     const handleCountdown = ({ count }) => setCountdown(count);
-    const handleBattleStarted = () => {
+    const handleBattleStarted = ({ startedAt }) => {
       setCountdown(null);
       setBattleStarted(true);
-      startTimer();
+      startTimer(startedAt); // pass startedAt from socket
       toast.success("Battle started! Good luck! 🚀");
     };
 
@@ -102,14 +104,28 @@ function BattleRoom() {
       );
     };
 
-    const handleBattleOver = ({ winnerId, winnerName }) => {
+    const handleBattleOver = ({
+      winnerId,
+      winnerName,
+      reason,
+      surrenderedBy,
+    }) => {
       setBattleEnded(true);
       clearInterval(timerRef.current);
       const isWinner = winnerId === user?.id;
-      toast(
-        isWinner ? "🎉 You won! AI feedback coming..." : `${winnerName} won!`,
-        { duration: 4000 },
-      );
+
+      if (reason === "surrender") {
+        toast(
+          isWinner
+            ? `${surrenderedBy} surrendered! You win! 🏆`
+            : "You surrendered!",
+          { duration: 4000, icon: isWinner ? "🏆" : "🏳️" },
+        );
+      } else {
+        toast(isWinner ? "🎉 You won!" : `${winnerName} won!`, {
+          duration: 4000,
+        });
+      }
     };
 
     const handleAiFeedbackReady = (data) => {
@@ -117,14 +133,12 @@ function BattleRoom() {
       setShowAiFeedback(true);
       setActiveTab("feedback");
       toast.success("AI feedback is ready! 🤖");
-      setTimeout(() => navigate(`/battle/result/${battle._id}`), 5000);
     };
 
     const handleBattleEnded = ({ reason }) => {
       setBattleEnded(true);
       clearInterval(timerRef.current);
       if (reason === "timeout") toast.error("Time's up!");
-      setTimeout(() => navigate(`/battle/result/${battle._id}`), 3000);
     };
 
     const handlePlayerDisconnected = ({ userId: disconnectedId }) => {
@@ -166,6 +180,21 @@ function BattleRoom() {
       socket.off("new_message", handleNewMessage);
     };
   }, [socket, battle?._id, roomCode]);
+  const handleSurrender = async () => {
+    if (!confirm("Are you sure you want to surrender? Your opponent will win."))
+      return;
+    setSurrendering(true);
+    try {
+      await surrenderBattle({ battleId: battle._id });
+      toast.error("You surrendered!");
+      setBattleEnded(true);
+      clearInterval(timerRef.current);
+    } catch (error) {
+      toast.error("Failed to surrender");
+    } finally {
+      setSurrendering(false);
+    }
+  };
 
   const fetchBattle = async () => {
     try {
@@ -174,7 +203,7 @@ function BattleRoom() {
 
       if (data.status === "active") {
         setBattleStarted(true);
-        startTimer();
+        startTimer(data.startedAt); // pass startedAt from DB
       }
 
       if (data.problem?.starterCode?.[language]) {
@@ -188,19 +217,28 @@ function BattleRoom() {
     }
   };
 
-  const startTimer = () => {
+  // Replace these state and ref declarations
+
+  // Replace startTimer function
+  const startTimer = (startedAt = null) => {
+    // Store battle start time
+    battleStartTimeRef.current = startedAt ? new Date(startedAt) : new Date();
+
+    // Clear any existing timer
+    if (timerRef.current) clearInterval(timerRef.current);
+
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          socket?.emit("battle_timeout", { roomCode });
-          return 0;
-        }
-        return prev - 1;
-      });
+      const now = new Date();
+      const elapsed = Math.floor((now - battleStartTimeRef.current) / 1000);
+      const remaining = Math.max(1800 - elapsed, 0);
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
+        socket?.emit("battle_timeout", { roomCode });
+      }
     }, 1000);
   };
-
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60)
       .toString()
@@ -307,23 +345,17 @@ function BattleRoom() {
   const handleGetHint = async () => {
     setGettingHint(true);
     try {
-      const res = await fetch("/api/battles/hint", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          battleId: battle._id,
-          currentCode: code,
-          language,
-        }),
+      const res = await API.post("/battles/hint", {
+        battleId: battle._id,
+        currentCode: code,
+        language,
       });
-      const data = await res.json();
+      const data = res.data;
       setHint(data.hint);
       setActiveTab("hint");
       toast.success("Hint generated! 💡");
     } catch (error) {
+      console.error("Hint error:", error);
       toast.error("Failed to get hint");
     } finally {
       setGettingHint(false);
@@ -801,7 +833,14 @@ function BattleRoom() {
                 disabled={gettingHint || !battleStarted || battleEnded}
                 className="text-xs bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-40"
               >
-                {gettingHint ? "..." : "💡 Hint"}
+                {gettingHint ? (
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    ...
+                  </span>
+                ) : (
+                  "💡 Hint"
+                )}
               </button>
               <button
                 onClick={handleRun}
@@ -848,6 +887,19 @@ function BattleRoom() {
               </button>
             </div>
           </div>
+          {/* Add this button next to Run and Submit */}
+          <button
+            onClick={handleSurrender}
+            disabled={surrendering || !battleStarted || battleEnded}
+            className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-40 border border-red-500/20 text-red-400 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          >
+            {surrendering ? (
+              <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              "🏳️"
+            )}
+            Surrender
+          </button>
 
           {/* Monaco Editor */}
           <div className="flex-1 overflow-hidden">
@@ -925,6 +977,18 @@ function BattleRoom() {
               Send
             </button>
           </div>
+        </div>
+      )}
+      {battleEnded && (
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
+          <button
+            onClick={() => navigate(`/battle/result/${battle._id}`)}
+            className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 px-8 rounded-2xl shadow-2xl shadow-violet-600/50 flex items-center gap-3 transition-all border border-violet-400/30"
+          >
+            <span className="text-2xl">🏆</span>
+            <span className="text-lg">View Final Results</span>
+            <span className="text-xl">➔</span>
+          </button>
         </div>
       )}
     </div>

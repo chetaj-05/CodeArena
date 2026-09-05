@@ -4,7 +4,7 @@ import User from "../models/User.js";
 import generateRoomCode from "../utils/generateRoomCode.js";
 import { analyzeCode, generateHint } from "../services/aiJudgeService.js";
 import { io } from "../server.js";
-
+import { runAIAnalysis } from "./codeController.js";
 // Create battle room
 export const createBattle = async (req, res) => {
   try {
@@ -243,17 +243,21 @@ const runAIJudge = async (battle) => {
 // Get hint from AI
 export const getHint = async (req, res) => {
   try {
-    const { battleId, currentAnswer } = req.body;
+    const { battleId, currentCode, language } = req.body;
+
+    if (!battleId) {
+      return res.status(400).json({ message: "Battle ID required" });
+    }
 
     const battle = await Battle.findById(battleId).populate("problem");
-
     if (!battle) {
       return res.status(404).json({ message: "Battle not found" });
     }
 
     const hint = await generateHint({
       problem: battle.problem,
-      playerAnswer: currentAnswer,
+      currentCode: currentCode || "",
+      language: language || "python",
     });
 
     res.json({ hint });
@@ -307,14 +311,12 @@ export const getLeaderboard = async (req, res) => {
     const users = await User.find({ "stats.battlesPlayed": { $gt: 0 } })
       .select("name stats createdAt")
       .sort({ "stats.wins": -1, "stats.winRate": -1 })
-      .limit(20);
-
+      .limit(50);
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 // Get battle history
 export const getBattleHistory = async (req, res) => {
   try {
@@ -352,5 +354,62 @@ const updateUserStats = async (userId, result) => {
     await user.save();
   } catch (error) {
     console.error("Update stats error:", error);
+  }
+};
+export const surrenderBattle = async (req, res) => {
+  try {
+    const { battleId } = req.body;
+
+    const battle = await Battle.findById(battleId).populate(
+      "players.user",
+      "name",
+    );
+
+    if (!battle) {
+      return res.status(404).json({ message: "Battle not found" });
+    }
+
+    if (battle.status !== "active") {
+      return res.status(400).json({ message: "Battle is not active" });
+    }
+
+    const surrenderingIndex = battle.players.findIndex(
+      (p) => p.user._id.toString() === req.user.id,
+    );
+
+    if (surrenderingIndex === -1) {
+      return res.status(403).json({ message: "You are not in this battle" });
+    }
+
+    const winnerIndex = surrenderingIndex === 0 ? 1 : 0;
+
+    battle.players[surrenderingIndex].status = "lost";
+    battle.players[winnerIndex].status = "won";
+    battle.winner = battle.players[winnerIndex].user._id;
+    battle.status = "judging";
+    battle.endedAt = new Date();
+
+    await battle.save();
+
+    // Notify both players
+    io.to(battle.roomCode).emit("battle_over", {
+      winnerId: battle.players[winnerIndex].user._id,
+      winnerName: battle.players[winnerIndex].user.name,
+      reason: "surrender",
+      surrenderedBy: battle.players[surrenderingIndex].user.name,
+    });
+
+    // Update stats
+    await updateUserStats(battle.players[winnerIndex].user._id, "win");
+    await updateUserStats(req.user.id, "loss");
+
+    // Run AI analysis
+    const problem = await Problem.findById(battle.problem);
+    if (problem) runAIAnalysis(battle, problem);
+
+    res.json({ message: "Surrendered successfully" });
+  } catch (error) {
+    console.error("Surrender error:", error);
+    res.status(500).json({ message: "Failed to surrender" });
   }
 };
