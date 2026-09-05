@@ -20,7 +20,7 @@ const executeCode = async (code, language, stdin = "") => {
     },
     {
       headers: {
-        Authorization: process.env.ONLINE_COMPILER_API_KEY,
+        Authorization: process.env.ONLINECOMPILER_API_KEY,
         "Content-Type": "application/json",
       },
       timeout: 15000,
